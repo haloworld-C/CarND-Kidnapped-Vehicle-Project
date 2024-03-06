@@ -16,6 +16,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <limits>
 
 #include "helper_functions.h"
 
@@ -69,32 +70,67 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
         setUncertain(particle, std_pos);
     }
 }
-
+/**
+ * @brief: data association for debug
+ * @param: predicted, obstacles in robot coordinate
+ * @param: observations in sensor, obstacles in robot coordinate
+ * @Note: for different landmark form, how to association is the key
+*/
 void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted,
                                      vector<LandmarkObs>& observations) {
-    /**
-     * TODO: Find the predicted measurement that is closest to each
-     *   observed measurement and assign the observed measurement to this
-     *   particular landmark.
-     */
+    const int lenObservation = observations.size();
+    const int lenPredictedLandMark = predicted.size();
+    for(int m = 0; m < lenObservation; m++) {
+        double minDis = std::numeric_limits<double> ::infinity();
+        for(int n = 0; n < lenPredictedLandMark; n++) {
+            auto& curObs = observations[m];
+            auto curPre = predicted[n];
+            auto curDis = dist(curObs.x, curObs.y, curPre.x, curPre.y);
+            if(curDis < minDis) {
+                minDis = curDis;
+                curObs.id = curPre.id;
+            }
+        }
+    }
 }
 
+/**
+ * TODO: Update the weights of each particle using a mult-variate Gaussian
+ *   distribution. You can read more about this distribution here:
+ *   https://en.wikipedia.org/wiki/Multivariate_normal_distribution
+ * NOTE: The observations are given in the VEHICLE'S coordinate system.
+ *   Your particles are located according to the MAP'S coordinate system.
+ *   You will need to transform between the two systems. Keep in mind that
+ *   this transformation requires both rotation AND translation (but no
+ * scaling). The following is a good resource for the theory:
+ *   https://www.willamette.edu/~gorr/classes/GeneralGraphics/Transforms/transforms2d.htm
+ *   and the following is a good resource for the actual equation to
+ * implement (look at equation 3.33) http://planning.cs.uiuc.edu/node99.html
+ */
+// convert to to map system according to particles
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
                                    const vector<LandmarkObs>& observations,
                                    const Map& map_landmarks) {
-    /**
-     * TODO: Update the weights of each particle using a mult-variate Gaussian
-     *   distribution. You can read more about this distribution here:
-     *   https://en.wikipedia.org/wiki/Multivariate_normal_distribution
-     * NOTE: The observations are given in the VEHICLE'S coordinate system.
-     *   Your particles are located according to the MAP'S coordinate system.
-     *   You will need to transform between the two systems. Keep in mind that
-     *   this transformation requires both rotation AND translation (but no
-     * scaling). The following is a good resource for the theory:
-     *   https://www.willamette.edu/~gorr/classes/GeneralGraphics/Transforms/transforms2d.htm
-     *   and the following is a good resource for the actual equation to
-     * implement (look at equation 3.33) http://planning.cs.uiuc.edu/node99.html
-     */
+    for(auto particle& : particles) {
+        vector<LandmarkObs> obsInMap;
+        for(auto& obs : obervations) {
+            obsInMap.push_back(transLocal2Global(obs, particle));
+        }
+        vector<LandmarkObs> obsPredicted;
+        for(auto& landmark : map_landmarks.landmark_list) {
+            if(dist(landmark.x, landmark.y, particle.x, particle.y) <= sensor_range) {
+                obsPredicted.push_back(landmark);
+            }
+        }
+        dataAssociation(obsPredicted, obsInMap); // id filled
+        // update association and weight
+        particle.associations.clear();
+        for(auto& obs : obsInMap) {
+            particle.associations.push_back(obs.id);
+            relatedLandmark = map_landmarks.landmark_list[obs.id];
+            particle.weight *= calculate2dGuassian(std_landmark, relatedLandmark, obs)
+        }
+    }
 }
 
 void ParticleFilter::resample() {

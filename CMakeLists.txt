@@ -7,10 +7,14 @@ add_definitions(-std=c++11)
 set(CXX_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS "${CXX_FLAGS}")
 
+find_package(Eigen3 REQUIRED)
+
 file(GLOB HEADERS src/*.h)
 file(GLOB HEADERS_HPP src/*.hpp)
 
 set(sources src/particle_filter.cpp src/main.cpp ${HEADERS} ${HEADERS_HPP})
+
+include_directories(${EIGEN3_INCLUDE_DIRS})
 
 
 

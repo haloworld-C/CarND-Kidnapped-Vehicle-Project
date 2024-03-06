@@ -16,6 +16,8 @@
 #include <string>
 #include <vector>
 
+#include <Eigen/Dense>
+
 #include "map.h"
 
 // for portability of M_PI (Vis Studio, MinGW, etc.)
@@ -243,6 +245,34 @@ inline bool read_landmark_data(std::string filename,
         observations.push_back(meas);
     }
     return true;
+}
+// convert from car coordinate to map coordinate
+inline LandmarkObs 
+transLocal2Global(const LandmarkObs& observation, 
+                    const Particle& particle) {
+    LandmarkObs obsInMap;
+    double& pYaw = particle.theta;
+    double& xLocal = observation.x;
+    double& yLocal = observation.y;
+    obsInMap.x = particle.x + cos(pYaw) * xLocal - sin(pYaw) * yLocal;
+    obsInMap.y = particle.y + sin(pYaw) * xLocal + cos(pYaw) * yLocal;
+
+    return obsInMap;
+}
+// check overflow
+inline double square(double x) {
+    return x * x;
+}
+inline double
+calculate2dGuassian(double std_pos[], 
+                    const LandmarkObs& landmark,
+                    const LandmarkObs& obs) {
+    double result = 0;
+    double& ux = landmark.x;
+    double& uy = landmark.y;
+    result = std::exp(-square(obs.x - ux)/(2*square(std_pos[0]))
+                    -square(obs.y - uy)/(2*square(std_pos[1]))) / (2*M_PI*std_pos[0]*std_pos[1])
+    return result;
 }
 
 #endif  // HELPER_FUNCTIONS_H_
