@@ -31,7 +31,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
      * TODO: Add random Gaussian noise to each particle.
      */
     num_particles = 100;  // TODO: Set the number of particles
-    size_t stdByteLen = sizeof(std);
+    size_t stdByteLen = sizeof(std[0]);
     if(stdByteLen == 0 || (stdByteLen / sizeof(std[0]) != 3)) {
         throw std::runtime_error("std size not equal to state dimension !!");
     }
@@ -39,7 +39,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
     std::normal_distribution<double> x_distribution(x, std[0]);
     std::normal_distribution<double> y_distribution(y, std[1]);
     std::normal_distribution<double> theta_distribution(theta, std[2]);
-    for (size_t i = 0; i < num_particles; i++) {
+    for (int i = 0; i < num_particles; i++) {
         Particle particle;
         particle.id = i;
         particle.x = x_distribution(generator);
@@ -61,7 +61,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
  */
 void ParticleFilter::prediction(double delta_t, double std_pos[],
                                 double velocity, double yaw_rate) {
-    for (size_t i = 0; i < num_particles; i++) {
+    for (int i = 0; i < num_particles; i++) {
         auto& particle = particles[i];
         double curYaw = particle.theta;
         particle.x = particle.x + velocity * cos(curYaw) * delta_t;
@@ -111,15 +111,15 @@ void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted,
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
                                    const vector<LandmarkObs>& observations,
                                    const Map& map_landmarks) {
-    for(auto particle& : particles) {
+    for(auto& particle : particles) {
         vector<LandmarkObs> obsInMap;
-        for(auto& obs : obervations) {
+        for(auto& obs : observations) {
             obsInMap.push_back(transLocal2Global(obs, particle));
         }
         vector<LandmarkObs> obsPredicted;
         for(auto& landmark : map_landmarks.landmark_list) {
-            if(dist(landmark.x, landmark.y, particle.x, particle.y) <= sensor_range) {
-                obsPredicted.push_back(landmark);
+            if(dist(landmark.x_f, landmark.y_f, particle.x, particle.y) <= sensor_range) {
+                obsPredicted.emplace_back(landmark.id_i, landmark.x_f, landmark.y_f);
             }
         }
         dataAssociation(obsPredicted, obsInMap); // id filled
@@ -127,8 +127,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
         particle.associations.clear();
         for(auto& obs : obsInMap) {
             particle.associations.push_back(obs.id);
-            relatedLandmark = map_landmarks.landmark_list[obs.id];
-            particle.weight *= calculate2dGuassian(std_landmark, relatedLandmark, obs)
+            const auto& relatedLandmark = map_landmarks.landmark_list[obs.id];
+            particle.weight *= calculate2dGuassian(std_landmark, relatedLandmark, obs);
         }
     }
 }
@@ -158,7 +158,7 @@ void ParticleFilter::resample() {
     // begin resample
     int index = 0;
     double beta = 0.0;
-    std::vector sampledWeight;
+    std::vector<Particle> sampledParticles;
     int lenStep = weights.size();
     for(int i = 0; i < lenStep; ++i) {
         beta += 2 * dis(gen) * maxNormalizedWeight;
@@ -166,7 +166,7 @@ void ParticleFilter::resample() {
             beta -= normalizedWeightVec(index);
             index = (index + 1) % lenStep;
         }
-        sampledWeight.push_back(particles[index]);
+        sampledParticles.push_back(particles[index]);
     }
 }
 

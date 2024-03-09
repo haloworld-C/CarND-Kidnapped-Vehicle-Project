@@ -46,11 +46,28 @@ struct ground_truth {
  * Struct representing one landmark observation measurement.
  */
 struct LandmarkObs {
+    LandmarkObs() = default;
+    LandmarkObs(int id_p, int x_p, int y_p): id(id_p), x(x_p), y(y_p){}
+    LandmarkObs(const Map::single_landmark_s& landmark) {
+        id = landmark.id_i;
+        x = landmark.x_f;
+        y = landmark.y_f;
+    }
     int id;    // Id of matching landmark in the map.
     double x;  // Local (vehicle coords) x position of landmark observation [m]
     double y;  // Local (vehicle coords) y position of landmark observation [m]
 };
 
+struct Particle {
+    int id;
+    double x;
+    double y;
+    double theta;
+    double weight;
+    std::vector<int> associations;
+    std::vector<double> sense_x;
+    std::vector<double> sense_y;
+};
 /**
  * Computes the Euclidean distance between two 2D points.
  * @param (x1,y1) x and y coordinates of first point
@@ -249,13 +266,13 @@ inline bool read_landmark_data(std::string filename,
 // convert from car coordinate to map coordinate
 inline LandmarkObs 
 transLocal2Global(const LandmarkObs& observation, 
-                    const Particle& particle) {
+                    Particle& particle) {
     LandmarkObs obsInMap;
-    double& pYaw = particle.theta;
-    double& xLocal = observation.x;
-    double& yLocal = observation.y;
-    obsInMap.x = particle.x + cos(pYaw) * xLocal - sin(pYaw) * yLocal;
-    obsInMap.y = particle.y + sin(pYaw) * xLocal + cos(pYaw) * yLocal;
+    const double& pYaw = particle.theta;
+    const double& xLocal = observation.x;
+    const double& yLocal = observation.y;
+    obsInMap.x = particle.x + cos(pYaw)*xLocal - sin(pYaw)*yLocal;
+    obsInMap.y = particle.y + sin(pYaw)*xLocal + cos(pYaw)*yLocal;
 
     return obsInMap;
 }
@@ -268,10 +285,10 @@ calculate2dGuassian(double std_pos[],
                     const LandmarkObs& landmark,
                     const LandmarkObs& obs) {
     double result = 0;
-    double& ux = landmark.x;
-    double& uy = landmark.y;
+    const double& ux = landmark.x;
+    const double& uy = landmark.y;
     result = std::exp(-square(obs.x - ux)/(2*square(std_pos[0]))
-                    -square(obs.y - uy)/(2*square(std_pos[1]))) / (2*M_PI*std_pos[0]*std_pos[1])
+                    -square(obs.y - uy)/(2*square(std_pos[1]))) / (2*M_PI*std_pos[0]*std_pos[1]);
     return result;
 }
 
