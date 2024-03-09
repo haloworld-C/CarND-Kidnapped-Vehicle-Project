@@ -133,13 +133,41 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     }
 }
 
+/**
+ * TODO: Resample particles with replacement with probability proportional
+ *   to their weight.
+ * NOTE: resample的本质在于根据概率随机舍弃
+ */
 void ParticleFilter::resample() {
-    /**
-     * TODO: Resample particles with replacement with probability proportional
-     *   to their weight.
-     * NOTE: You may find std::discrete_distribution helpful here.
-     *   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
-     */
+    // get weights
+    weights.clear();
+    double sumWeight = 0;
+    for(auto& particle : particles) {
+        const double& curWeight = particle.weight;
+        sumWeight += curWeight;
+        weights.push_back(curWeight);
+    }
+    Eigen::VectorXd weightVec = Eigen::Map<Eigen::VectorXd>(weights.data(), weights.size());
+    auto normalizedWeightVec = weightVec / sumWeight;
+    double maxNormalizedWeight = normalizedWeightVec.maxCoeff();
+    std::random_device rd; 
+	// 使用 Mersenne Twister 引擎 
+	std::mt19937 gen(rd()); 
+	// 创建均匀分布器，范围为 [0, 1)
+	std::uniform_real_distribution<> dis(0.0, 1.0); 
+    // begin resample
+    int index = 0;
+    double beta = 0.0;
+    std::vector sampledWeight;
+    int lenStep = weights.size();
+    for(int i = 0; i < lenStep; ++i) {
+        beta += 2 * dis(gen) * maxNormalizedWeight;
+        while(normalizedWeightVec(index) < beta) {
+            beta -= normalizedWeightVec(index);
+            index = (index + 1) % lenStep;
+        }
+        sampledWeight.push_back(particles[index]);
+    }
 }
 
 void ParticleFilter::SetAssociations(Particle& particle,
